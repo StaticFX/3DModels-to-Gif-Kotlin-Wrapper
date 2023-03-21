@@ -5,7 +5,6 @@ class ThreeDModel(file: File) {
 
     init {
         if (file.extension != "stl") error("Unsupported file format")
-
         model = file
     }
 }
