@@ -22,12 +22,21 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
+
+/**
+ * Wrapper class using to generate gif from 3d models
+ *
+ * @param serverURL of the service to use, if on localhost, http://localhost:3000
+ */
 class GifGenerator(private val serverURL: String) {
 
     private val HOST_BLOCKING = "$serverURL/create/gif"
 
     private val readyFunctions = mutableListOf<() -> Unit>()
 
+    /**
+     * If the service is ready to use or not
+     */
     var isReady = false
         private set
 
@@ -37,6 +46,10 @@ class GifGenerator(private val serverURL: String) {
         }
     }
 
+    /**
+     * Executes the supplied functions as soon as the service is ready
+     * @param ready function
+     */
     fun onReady(ready: () -> Unit) {
         readyFunctions.add(ready)
     }
@@ -56,6 +69,10 @@ class GifGenerator(private val serverURL: String) {
         }, 10, 1000)
     }
 
+    /**
+     * Checks the server status of the service
+     * @return boolean whether the service is online or not
+     */
     suspend fun checkServerStatus(): Boolean {
         return try {
             val res = client.get("$serverURL/check/status") {
@@ -63,13 +80,20 @@ class GifGenerator(private val serverURL: String) {
                     requestTimeoutMillis = 1000
                 }
             }
-            println(res.status)
             res.status == HttpStatusCode.OK
         } catch (e: Exception) {
             false
         }
     }
 
+    /**
+     * Generates a gif blocking from the supplied model
+     *
+     * @param file to generate the gif to, this file will always be deleted before a gif is being written
+     * @param model to generate the model from
+     * @param gifOptions the generation options
+     * @return file of the generated gif
+     */
     @OptIn(InternalAPI::class)
     fun generateGifBlocking(file: File, model: ThreeDModel, gifOptions: GifOptions = GifOptions()): File {
         runBlocking {
@@ -77,7 +101,6 @@ class GifGenerator(private val serverURL: String) {
         }
 
         val json = Gson().toJson(gifOptions)
-        println(json)
 
         if (file.exists()) file.delete()
 
@@ -107,6 +130,15 @@ class GifGenerator(private val serverURL: String) {
         return file
     }
 
+    /**
+     * Generates a gif non-blocking
+     *
+     * @param file to generate the gif to, will always be deleted before the new gif being written
+     * @param model to generate  the gif from
+     * @param gifOptions options to generate
+     * @param done functions executed as soon as the file is finished
+     * @return future including the finished file
+     */
     @OptIn(InternalAPI::class, DelicateCoroutinesApi::class)
     fun generateGif(file: File, model: ThreeDModel, gifOptions: GifOptions = GifOptions(), done: (File) -> Unit): CompletableFuture<File> {
         val future = CompletableFuture<File>()
@@ -114,7 +146,6 @@ class GifGenerator(private val serverURL: String) {
             if (!checkServerStatus()) error("Javascript service is not running")
 
             val json = Gson().toJson(gifOptions)
-            println(json)
 
             if (file.exists()) file.delete()
 
