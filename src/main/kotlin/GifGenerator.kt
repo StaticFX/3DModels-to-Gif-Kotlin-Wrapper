@@ -17,7 +17,9 @@ import java.io.File
 import java.lang.Exception
 import java.lang.ProcessBuilder.Redirect
 import java.util.*
+import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
 class GifGenerator(private val serverURL: String) {
@@ -54,7 +56,7 @@ class GifGenerator(private val serverURL: String) {
         }, 10, 1000)
     }
 
-    private suspend fun checkServerStatus(): Boolean {
+    suspend fun checkServerStatus(): Boolean {
         return try {
             val res = client.get("$serverURL/check/status") {
                 timeout {
@@ -91,19 +93,54 @@ class GifGenerator(private val serverURL: String) {
 
         runBlocking {
             client.preparePost(HOST_BLOCKING) { body = multipart }.execute {
-                println(it.status)
+                if (it.status != HttpStatusCode.OK) error("Unexpected error while generating gif: ${it.status} ${it.bodyAsText()}")
                 val channel: ByteReadChannel = it.body()
                 while (!channel.isClosedForRead) {
                     val packet = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
                     while (!packet.isEmpty) {
                         val bytes = packet.readBytes()
                         file.appendBytes(bytes)
-                        println("Received ${file.length()} bytes from ${it.contentLength()}")
                     }
                 }
-                println("A file saved to ${file.path}")
             }
         }
         return file
+    }
+
+    @OptIn(InternalAPI::class, DelicateCoroutinesApi::class)
+    fun generateGif(file: File, model: ThreeDModel, gifOptions: GifOptions = GifOptions(), done: (File) -> Unit): CompletableFuture<File> {
+        val future = CompletableFuture<File>()
+        GlobalScope.async {
+            if (!checkServerStatus()) error("Javascript service is not running")
+
+            val json = Gson().toJson(gifOptions)
+            println(json)
+
+            if (file.exists()) file.delete()
+
+            val multipart = MultiPartFormDataContent(
+                formData {
+                    append("options", json)
+                    append("file", model.model.readBytes(), Headers.build {
+                        append(HttpHeaders.ContentType, "application/octet-stream")
+                        append(HttpHeaders.ContentDisposition, "filename=${model.model.name}")
+                    })
+                })
+            client.preparePost(HOST_BLOCKING) { body = multipart }.execute {
+                if (it.status != HttpStatusCode.OK) error("Unexpected error while generating gif: ${it.status} ${it.bodyAsText()}")
+                val channel: ByteReadChannel = it.body()
+                while (!channel.isClosedForRead) {
+                    val packet = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
+                    while (!packet.isEmpty) {
+                        val bytes = packet.readBytes()
+                        file.appendBytes(bytes)
+                    }
+                }
+            }
+
+            done(file)
+            future.complete(file)
+        }
+        return future
     }
 }
