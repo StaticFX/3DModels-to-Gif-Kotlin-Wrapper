@@ -14,17 +14,12 @@ import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.*
 import java.io.File
-import java.lang.Exception
-import java.lang.ProcessBuilder.Redirect
 import java.util.*
-import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Future
-import java.util.concurrent.TimeUnit
 
 
 /**
- * Wrapper class using to generate gif from 3d models
+ * Wrapper class using to generate gif from 3d modelsØ
  *
  * @param serverURL of the service to use, if on localhost, http://localhost:3000
  */
