@@ -12,7 +12,8 @@ data class GifOptions(var name: String = "model",
                       var height: Int = 512,
                       var loop: Int = 0,
                       var delay: Int = 100,
-                      var anglePerFrame: Int = 10)
+                      var anglePerFrame: Int = 10,
+                      var label: String = "")
 
 
 @Serializable
